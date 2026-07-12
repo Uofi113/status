@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>LemonovOS Status</title>
+    <link rel="icon" type="image/png" href="favicon.png">
+    <style>
+        :root {
+            --bg-base: #11111b; 
+            --bg-mantle: #181825;
+            --bg-crust: #11111b;
+            --app-bg: rgba(30, 30, 46, 0.75); 
+            --card-bg: rgba(49, 50, 68, 0.4);
+            --card-hover: rgba(69, 71, 90, 0.6);
+            --accent: #cba6f7; 
+            --accent-glow: rgba(203, 166, 247, 0.15);
+            --text-main: #cdd6f4;
+            --text-muted: #a6adc8;
+            --text-sub: #7f849c;
+            --border: rgba(255, 255, 255, 0.05);
+            --border-highlight: rgba(203, 166, 247, 0.3);
+            --success: #a6e3a1;
+            --warning: #f9e2af;
+            --danger: #f38ba8;
+            --glass-blur: blur(20px);
+            --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .blob-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; overflow: hidden; pointer-events: none; }
+        .blob { position: absolute; filter: blur(90px); opacity: 0.3; animation: float 20s infinite alternate cubic-bezier(0.4, 0, 0.2, 1); }
+        .blob-1 { top: -10%; left: -10%; width: 50vw; height: 50vw; background: var(--accent); animation-delay: 0s; }
+        .blob-2 { bottom: -20%; right: -10%; width: 60vw; height: 60vw; background: #89b4fa; animation-delay: -5s; }
+        
+        @keyframes float {
+            0% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(5%, 10%) scale(1.1); }
+            100% { transform: translate(-5%, -5%) scale(0.9); }
+        }
+
+        .app-window {
+            display: flex; 
+            flex-direction: column;
+            width: 90vw; 
+            max-width: 1200px; 
+            height: 85vh;
+            background: var(--app-bg); 
+            backdrop-filter: var(--glass-blur); 
+            -webkit-backdrop-filter: var(--glass-blur);
+            border-radius: 24px; 
+            border: 1px solid var(--border);
+            box-shadow: 0 40px 80px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1);
+            z-index: 10; 
+            padding: 40px 50px;
+            overflow-y: auto;
+        }
+
+        .app-window::-webkit-scrollbar { width: 6px; }
+        .app-window::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+
+        .header-block { text-align: center; margin-bottom: 35px; animation: slideDown 0.5s ease forwards; }
+        h1 { font-size: 2.8rem; font-weight: 800; color: var(--text-main); margin-bottom: 10px; letter-spacing: -0.5px; }
+        .gradient-text { background: linear-gradient(135deg, var(--accent), #89dceb); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .subtitle { font-size: 1.05rem; color: var(--text-muted); line-height: 1.6; }
+
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            animation: slideUp 0.5s ease forwards;
+            margin-bottom: 30px;
+        }
+
+        .status-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 20px 25px;
+            display: flex;
+            flex-direction: column;
+            transition: var(--transition);
+            height: 100%;
+        }
+        .status-card:hover { border-color: var(--border-highlight); background: var(--card-hover); transform: translateY(-3px); box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+
+        .card-top { display: flex; gap: 20px; align-items: center; margin-bottom: 20px; }
+        .card-icon { width: 52px; height: 52px; background: var(--bg-crust); border-radius: 14px; display: flex; align-items: center; justify-content: center; color: var(--accent); border: 1px solid var(--border); flex-shrink: 0; box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
+        .card-info { display: flex; flex-direction: column; gap: 4px; }
+        .card-title { font-size: 1.2rem; font-weight: 700; color: var(--text-main); }
+        .card-desc { font-size: 0.9rem; color: var(--text-muted); line-height: 1.4; }
+
+        .card-bottom { margin-top: auto; padding-top: 15px; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+        .status-indicator { display: flex; align-items: center; gap: 10px; }
+        .status-dot { width: 12px; height: 12px; border-radius: 50%; transition: var(--transition); }
+        .status-text { font-size: 0.9rem; font-weight: 600; letter-spacing: 0.5px; }
+        .ping-text { font-family: monospace; font-size: 0.85rem; color: var(--text-sub); opacity: 0; transition: opacity 0.3s; }
+
+        /* Состояния карточек */
+        .state-checking .status-dot { background: var(--warning); box-shadow: 0 0 10px var(--warning); animation: pulseYellow 1s infinite; }
+        .state-checking .status-text { color: var(--warning); }
+        .state-online .status-dot { background: var(--success); box-shadow: 0 0 10px var(--success); animation: pulseGreen 2s infinite; }
+        .state-online .status-text { color: var(--success); }
+        .state-online .ping-text { opacity: 1; }
+        .state-offline .status-dot { background: var(--danger); box-shadow: 0 0 10px var(--danger); animation: pulseRed 1s infinite; }
+        .state-offline .status-text { color: var(--danger); }
+
+        /* ===== НОВАЯ КАРТОЧКА ПЕТРУСИ ===== */
+        .petrusya-card {
+            grid-column: span 2; 
+            padding: 0 !important; 
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: row;
+        }
+        
+        .petrusya-content {
+            padding: 20px 25px;
+            z-index: 2;
+            width: 60%;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        
+        .petrusya-bg {
+            position: absolute;
+            right: 0;
+            top: 0;
+            width: 55%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        .petrusya-bg img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            /* Плавный градиент слева направо: от прозрачного к картинке */
+            -webkit-mask-image: linear-gradient(to right, transparent 0%, black 40%);
+            mask-image: linear-gradient(to right, transparent 0%, black 40%);
+        }
+
+        @media (max-width: 1050px) {
+            .status-grid { grid-template-columns: repeat(2, 1fr); }
+            .petrusya-card { grid-column: span 2; }
+            .petrusya-content { width: 100%; background: linear-gradient(90deg, var(--card-bg) 60%, transparent); }
+        }
+        @media (max-width: 700px) {
+            .status-grid { grid-template-columns: 1fr; }
+            .petrusya-card { grid-column: span 1; flex-direction: column; }
+            .petrusya-bg { position: relative; width: 100%; height: 150px; }
+            .petrusya-bg img { -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 50%); }
+            .petrusya-content { width: 100%; }
+        }
+
+        /* Командный центр */
+        .dashboard-bottom { display: flex; gap: 20px; animation: slideUp 0.7s ease forwards; flex-grow: 1; }
+        .global-status { flex: 1; background: linear-gradient(135deg, rgba(166, 227, 161, 0.05), rgba(166, 227, 161, 0.01)); border: 1px solid rgba(166, 227, 161, 0.2); border-radius: 20px; padding: 30px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; position: relative; overflow: hidden; transition: all 0.5s ease; }
+        .global-status::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--success); box-shadow: 0 0 20px var(--success); transition: background 0.5s; }
+        .global-icon { margin-bottom: 15px; color: var(--success); filter: drop-shadow(0 0 10px rgba(166, 227, 161, 0.5)); transition: all 0.5s; }
+        .global-title { font-size: 1.8rem; font-weight: 800; color: var(--success); letter-spacing: 1px; margin-bottom: 5px; text-transform: uppercase; transition: color 0.5s; }
+        .global-desc { color: var(--text-muted); font-size: 0.95rem; }
+        .uptime-ticker { margin-top: 15px; font-family: monospace; font-size: 1.1rem; color: var(--text-main); background: var(--bg-crust); padding: 8px 16px; border-radius: 10px; border: 1px solid var(--border); }
+        .global-status.danger { background: linear-gradient(135deg, rgba(243, 139, 168, 0.05), rgba(243, 139, 168, 0.01)); border-color: rgba(243, 139, 168, 0.3); animation: pulseDangerBox 2s infinite; }
+        .global-status.danger::before { background: var(--danger); box-shadow: 0 0 20px var(--danger); }
+        .global-status.danger .global-icon, .global-status.danger .global-title { color: var(--danger); filter: drop-shadow(0 0 15px rgba(243, 139, 168, 0.6)); }
+
+        @keyframes pulseDangerBox { 0% { box-shadow: inset 0 0 0 rgba(243, 139, 168, 0); } 50% { box-shadow: inset 0 0 30px rgba(243, 139, 168, 0.1); } 100% { box-shadow: inset 0 0 0 rgba(243, 139, 168, 0); } }
+
+        .terminal-box { flex: 1.5; background: var(--bg-crust); border: 1px solid var(--border); border-radius: 20px; display: flex; flex-direction: column; overflow: hidden; box-shadow: inset 0 0 30px rgba(0,0,0,0.5); position: relative; }
+        .terminal-header { background: var(--bg-mantle); padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
+        .terminal-dots { display: flex; gap: 8px; }
+        .t-dot { width: 12px; height: 12px; border-radius: 50%; }
+        .t-dot.r { background: var(--danger); } .t-dot.y { background: var(--warning); } .t-dot.g { background: var(--success); }
+        .terminal-title { font-family: monospace; font-size: 0.85rem; color: var(--text-sub); }
+        .terminal-body { padding: 15px 20px; flex-grow: 1; overflow-y: auto; font-family: 'Courier New', Courier, monospace; font-size: 0.85rem; line-height: 1.6; color: var(--text-muted); display: flex; flex-direction: column; gap: 4px; }
+        .terminal-body::-webkit-scrollbar { width: 4px; }
+        .terminal-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+        .log-line { display: flex; gap: 10px; word-break: break-all; }
+        .log-time { color: var(--text-sub); flex-shrink: 0; }
+        .log-msg { color: #a6e3a1; text-shadow: 0 0 5px rgba(166, 227, 161, 0.2); }
+        .log-msg.warn { color: var(--warning); text-shadow: 0 0 5px rgba(249, 226, 175, 0.2); }
+        .log-msg.err { color: var(--danger); text-shadow: 0 0 5px rgba(243, 139, 168, 0.2); }
+        .log-msg.sys { color: var(--accent); }
+        .cursor { display: inline-block; width: 8px; height: 15px; background: var(--accent); animation: blink 1s step-end infinite; vertical-align: middle; margin-left: 5px; }
+
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+        @keyframes pulseGreen { 0% { box-shadow: 0 0 0 0 rgba(166, 227, 161, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(166, 227, 161, 0); } 100% { box-shadow: 0 0 0 0 rgba(166, 227, 161, 0); } }
+        @keyframes pulseRed { 0% { box-shadow: 0 0 0 0 rgba(243, 139, 168, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(243, 139, 168, 0); } 100% { box-shadow: 0 0 0 0 rgba(243, 139, 168, 0); } }
+        @keyframes pulseYellow { 0% { box-shadow: 0 0 0 0 rgba(249, 226, 175, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(249, 226, 175, 0); } 100% { box-shadow: 0 0 0 0 rgba(249, 226, 175, 0); } }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+
+        @media (max-width: 900px) {
+            .app-window { width: 100vw; height: 100vh; border-radius: 0; border: none; padding: 30px 20px; }
+            h1 { font-size: 2.2rem; }
+            .dashboard-bottom { flex-direction: column; }
+            .terminal-box { height: 250px; flex: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="blob-container">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+    </div>
+
+    <div class="app-window">
+        <div class="header-block">
+            <h1>Системы <span class="gradient-text">LemonovOS</span></h1>
+            <p class="subtitle">Мониторинг состояния серверов и сервисов в реальном времени</p>
+        </div>
+
+        <div class="status-grid">
+            
+            <!-- Основной сайт -->
+            <div class="status-card" data-url="https://lemonovos.com" data-name="lemonovos.com">
+                <div class="card-top">
+                    <div class="card-icon">
+                        <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+                    </div>
+                    <div class="card-info">
+                        <div class="card-title">lemonovos.com</div>
+                        <div class="card-desc">Главный лендинг и визитка проекта</div>
+                    </div>
+                </div>
+                <div class="card-bottom state-checking">
+                    <div class="status-indicator">
+                        <div class="status-dot"></div>
+                        <div class="status-text">Проверка...</div>
+                    </div>
+                    <div class="ping-text">-- ms</div>
+                </div>
+            </div>
+
+            <!-- API -->
+            <div class="status-card" data-url="https://api.lemonovos.com" data-name="api.lemonovos.com">
+                <div class="card-top">
+                    <div class="card-icon">
+                        <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+                    </div>
+                    <div class="card-info">
+                        <div class="card-title">api.lemonovos.com</div>
+                        <div class="card-desc">Центральный бэкенд и база данных</div>
+                    </div>
+                </div>
+                <div class="card-bottom state-checking">
+                    <div class="status-indicator">
+                        <div class="status-dot"></div>
+                        <div class="status-text">Проверка...</div>
+                    </div>
+                    <div class="ping-text">-- ms</div>
+                </div>
+            </div>
+
+            <!-- Страница загрузок -->
+            <div class="status-card" data-url="https://download.lemonovos.com" data-name="download.lemonovos.com">
+                <div class="card-top">
+                    <div class="card-icon">
+                        <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                    </div>
+                    <div class="card-info">
+                        <div class="card-title">download.lemonovos.com</div>
+                        <div class="card-desc">Раздача ISO образов и репозитории</div>
+                    </div>
+                </div>
+                <div class="card-bottom state-checking">
+                    <div class="status-indicator">
+                        <div class="status-dot"></div>
+                        <div class="status-text">Проверка...</div>
+                    </div>
+                    <div class="ping-text">-- ms</div>
+                </div>
+            </div>
+
+            <!-- Форум -->
+            <div class="status-card" data-url="https://forum.lemonovos.com" data-name="forum.lemonovos.com">
+                <div class="card-top">
+                    <div class="card-icon">
+                        <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+                    </div>
+                    <div class="card-info">
+                        <div class="card-title">forum.lemonovos.com</div>
+                        <div class="card-desc">Комьюнити, обсуждения и багрепорты</div>
+                    </div>
+                </div>
+                <div class="card-bottom state-checking">
+                    <div class="status-indicator">
+                        <div class="status-dot"></div>
+                        <div class="status-text">Проверка...</div>
+                    </div>
+                    <div class="ping-text">-- ms</div>
+                </div>
+            </div>
+
+            <!-- Петруся (занимает 2 слота, градиентная маска) -->
+            <div class="status-card petrusya-card">
+                <div class="petrusya-content">
+                    <div class="card-top">
+                        <div class="card-icon" style="color: var(--accent); border: 1px solid var(--border-highlight); background: var(--accent-glow);">
+                            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5c.67 0 1.35.09 2 .26 1.78-2 3.82-2.67 4.49-2.26.84.5.37 2.53-.86 4.64C19.11 9.04 20 10.45 20 12c0 4.42-3.58 8-8 8s-8-3.58-8-8c0-1.55.89-2.96 2.37-4.36C5.14 5.53 4.67 3.5.51 3c.67-.41 2.71.26 4.49 2.26.65-.17 1.33-.26 2-.26z"></path><circle cx="9" cy="12" r="1"></circle><circle cx="15" cy="12" r="1"></circle><path d="M12 16c-.5 0-1-.2-1.4-.6l-.6-.6h4l-.6.6c-.4.4-.9.6-1.4.6z"></path></svg>
+                        </div>
+                        <div class="card-info">
+                            <div class="card-title">petrusya-daemon</div>
+                            <div class="card-desc">Главный системный администратор и инспектор кода</div>
+                        </div>
+                    </div>
+                    <div class="card-bottom" style="border-top: none; padding-top: 0;">
+                        <div class="status-indicator">
+                            <div class="status-dot" style="background: var(--accent); box-shadow: 0 0 10px var(--accent);"></div>
+                            <div class="status-text" id="petrusya-status" style="color: var(--accent);">Статус: Мурчит</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="petrusya-bg">
+                    <img src="https://lemonovos.com/img/petrusya.jpg" alt="Кошка Петруся">
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Командный центр -->
+        <div class="dashboard-bottom">
+            <!-- Глобальный статус -->
+            <div class="global-status" id="global-status-box">
+                <svg class="global-icon" id="global-icon" viewBox="0 0 24 24" width="64" height="64" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11"></polyline>
+                </svg>
+                <div class="global-title" id="global-title">СИСТЕМЫ В НОРМЕ</div>
+                <div class="global-desc" id="global-desc">Сбоев в маршрутизации не обнаружено</div>
+                <div class="uptime-ticker" id="uptime-ticker">Uptime: 00:00:00</div>
+            </div>
+
+            <!-- Терминал -->
+            <div class="terminal-box">
+                <div class="terminal-header">
+                    <div class="terminal-dots">
+                        <div class="t-dot r"></div><div class="t-dot y"></div><div class="t-dot g"></div>
+                    </div>
+                    <div class="terminal-title">root@lemonovos-mon:~</div>
+                </div>
+                <div class="terminal-body" id="term-body">
+                    <!-- Сюда падают логи -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const termBody = document.getElementById('term-body');
+        let isTyping = false;
+        let logQueue = [];
+
+        function getTimeString() {
+            const now = new Date();
+            return `[${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}]`;
+        }
+
+        function addLog(message, type = 'msg') {
+            logQueue.push({ msg: message, type: type, time: getTimeString() });
+            processQueue();
+        }
+
+        function processQueue() {
+            if (isTyping || logQueue.length === 0) return;
+            isTyping = true;
+            
+            const item = logQueue.shift();
+            const line = document.createElement('div');
+            line.className = 'log-line';
+            
+            const timeSpan = document.createElement('span');
+            timeSpan.className = 'log-time';
+            timeSpan.innerText = item.time;
+            
+            const msgSpan = document.createElement('span');
+            msgSpan.className = `log-msg ${item.type}`;
+            
+            const cursor = document.createElement('span');
+            cursor.className = 'cursor';
+
+            line.appendChild(timeSpan);
+            line.appendChild(msgSpan);
+            line.appendChild(cursor);
+            termBody.appendChild(line);
+
+            let i = 0;
+            function typeChar() {
+                if (i < item.msg.length) {
+                    msgSpan.innerHTML += item.msg.charAt(i);
+                    i++;
+                    termBody.scrollTop = termBody.scrollHeight;
+                    setTimeout(typeChar, Math.random() * 15 + 5); 
+                } else {
+                    cursor.remove(); 
+                    isTyping = false;
+                    processQueue();
+                }
+            }
+            typeChar();
+        }
+
+        let seconds = 0;
+        setInterval(() => {
+            seconds++;
+            const h = Math.floor(seconds / 3600).toString().padStart(2, '0');
+            const m = Math.floor((seconds % 3600) / 60).toString().padStart(2, '0');
+            const s = (seconds % 60).toString().padStart(2, '0');
+            document.getElementById('uptime-ticker').innerText = `Uptime: ${h}:${m}:${s}`;
+        }, 1000);
+
+        async function checkServices() {
+            const cards = document.querySelectorAll('.status-card[data-url]');
+            let hasErrors = false;
+            
+            addLog('Инициализация демона проверки...', 'sys');
+
+            for (let card of cards) {
+                const url = card.getAttribute('data-url');
+                const name = card.getAttribute('data-name');
+                const bottomPanel = card.querySelector('.card-bottom');
+                const textEl = card.querySelector('.status-text');
+                const pingEl = card.querySelector('.ping-text');
+
+                bottomPanel.className = 'card-bottom state-checking';
+                textEl.innerText = 'Проверка...';
+                pingEl.innerText = '-- ms';
+                
+                addLog(`Отправка пакета на ${name}...`);
+
+                const startTime = performance.now();
+                try {
+                    await fetch(url, { mode: 'no-cors', cache: 'no-store' });
+                    const pingTime = Math.round(performance.now() - startTime);
+                    
+                    bottomPanel.className = 'card-bottom state-online';
+                    textEl.innerText = 'Online / Работает';
+                    pingEl.innerText = `${pingTime} ms`;
+                    
+                    addLog(`Узел ${name} ответил. Latency: ${pingTime}ms.`, 'msg');
+                } catch (error) {
+                    hasErrors = true;
+                    bottomPanel.className = 'card-bottom state-offline';
+                    textEl.innerText = 'Offline / Недоступен';
+                    pingEl.innerText = 'ERR';
+                    
+                    addLog(`Таймаут соединения с ${name}! Узел недоступен.`, 'err');
+                }
+            }
+
+            const globBox = document.getElementById('global-status-box');
+            const globTitle = document.getElementById('global-title');
+            const globDesc = document.getElementById('global-desc');
+            const globIcon = document.getElementById('global-icon');
+
+            if (hasErrors) {
+                globBox.className = 'global-status danger';
+                globTitle.innerText = 'ОБНАРУЖЕН СБОЙ';
+                globDesc.innerText = 'Один или несколько сервисов недоступны. Требуется вмешательство.';
+                globIcon.innerHTML = '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line>';
+                addLog('CRITICAL: Обнаружено падение сервисов.', 'err');
+            } else {
+                globBox.className = 'global-status';
+                globTitle.innerText = 'СИСТЕМЫ В НОРМЕ';
+                globDesc.innerText = 'Все узлы LemonovOS работают в штатном режиме.';
+                globIcon.innerHTML = '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11"></polyline>';
+                addLog('Цикл проверки завершен. Все системы функционируют.', 'sys');
+            }
+            
+            // Рандомный статус Петруси
+            const catStatuses = ['Спит / Мурчит', 'Инспектирует код', 'Охотится за курсором', 'Смотрит в стену', 'Ждет релиз GTA 6'];
+            document.getElementById('petrusya-status').innerText = 'Статус: ' + catStatuses[Math.floor(Math.random() * catStatuses.length)];
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            addLog('LemonovOS Monitoring Service v1.0.6 запущен.', 'sys');
+            addLog('Загрузка конфигурации...', 'msg');
+            addLog('Запуск [petrusya-daemon] ... OK', 'sys'); 
+            
+            setTimeout(checkServices, 1500); 
+            // Пинг теперь строго раз в минуту (60000 мс)
+            setInterval(checkServices, 60000);
+        });
+
+        let keysPressed = '';
+        window.addEventListener('keydown', (e) => {
+            keysPressed += e.key.toLowerCase();
+            if (keysPressed.length > 4) {
+                keysPressed = keysPressed.substring(keysPressed.length - 4);
+            }
+            if (keysPressed === 'sudo') {
+                addLog('walzer is not in the sudoers file. This incident will be reported.', 'warn');
+                alert('walzer is not in the sudoers file. This incident will be reported.');
+                keysPressed = '';
+            }
+        });
+    </script>
+</body>
+</html>
